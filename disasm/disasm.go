@@ -490,3 +490,146 @@ func Disassemble(code []byte) ([]Instr, error) {
 	}
 	return out, nil
 }
+
+// SimpleDisassemble disassembles the given function. It also takes the function's
+// parent module as an argument for locating any other functions referenced by
+// fn.
+func SimpleDisassemble(fn wasm.Function, module *wasm.Module) (*Disassembly, error) {
+	code := fn.Body.Code
+	reader := bytes.NewReader(code)
+	assemlby := &Disassembly{}
+
+	for {
+		op, err := reader.ReadByte()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		opStr, err := ops.New(op)
+		if err != nil {
+			return nil, err
+		}
+		instr := Instr{
+			Op:         opStr,
+			Immediates: []interface{}{},
+		}
+
+		switch op {
+		case ops.Unreachable:
+		case ops.Drop:
+		case ops.Select:
+		case ops.Return:
+		case ops.End, ops.Else:
+
+		case ops.Block, ops.Loop, ops.If:
+			sig, err := leb128.ReadVarint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Block = &BlockInfo{
+				Start:     true,
+				Signature: wasm.BlockType(sig),
+			}
+			instr.Immediates = append(instr.Immediates, wasm.BlockType(sig))
+		case ops.Br, ops.BrIf:
+			depth, err := leb128.ReadVarUint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, depth)
+
+		case ops.BrTable:
+			targetCount, err := leb128.ReadVarUint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, targetCount)
+			for i := uint32(0); i < targetCount; i++ {
+				entry, err := leb128.ReadVarUint32(reader)
+				if err != nil {
+					return nil, err
+				}
+				instr.Immediates = append(instr.Immediates, entry)
+			}
+
+			defaultTarget, err := leb128.ReadVarUint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, defaultTarget)
+		case ops.Call, ops.CallIndirect:
+			index, err := leb128.ReadVarUint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, index)
+			if op == ops.CallIndirect {
+				reserved, err := leb128.ReadVarUint32(reader)
+				if err != nil {
+					return nil, err
+				}
+				instr.Immediates = append(instr.Immediates, reserved)
+			}
+		case ops.GetLocal, ops.SetLocal, ops.TeeLocal, ops.GetGlobal, ops.SetGlobal:
+			index, err := leb128.ReadVarUint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, index)
+		case ops.I32Const:
+			i, err := leb128.ReadVarint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, i)
+		case ops.I64Const:
+			i, err := leb128.ReadVarint64(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, i)
+		case ops.F32Const:
+			var i uint32
+			// TODO(vibhavp): Switch to a reflect-free method in the future
+			// for reading off the bytestream.
+			err := binary.Read(reader, binary.LittleEndian, &i)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, math.Float32frombits(i))
+		case ops.F64Const:
+			var i uint64
+			// TODO(vibhavp): Switch to a reflect-free method in the future
+			// for reading off the bytestream.
+			err := binary.Read(reader, binary.LittleEndian, &i)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, math.Float64frombits(i))
+		case ops.I32Load, ops.I64Load, ops.F32Load, ops.F64Load, ops.I32Load8s, ops.I32Load8u, ops.I32Load16s, ops.I32Load16u, ops.I64Load8s, ops.I64Load8u, ops.I64Load16s, ops.I64Load16u, ops.I64Load32s, ops.I64Load32u, ops.I32Store, ops.I64Store, ops.F32Store, ops.F64Store, ops.I32Store8, ops.I32Store16, ops.I64Store8, ops.I64Store16, ops.I64Store32:
+			// read memory_immediate
+			flags, err := leb128.ReadVarUint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, flags)
+
+			offset, err := leb128.ReadVarUint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, offset)
+		case ops.CurrentMemory, ops.GrowMemory:
+			res, err := leb128.ReadVarUint32(reader)
+			if err != nil {
+				return nil, err
+			}
+			instr.Immediates = append(instr.Immediates, uint8(res))
+		}
+
+		assemlby.Code = append(assemlby.Code, instr)
+	}
+
+	return assemlby, nil
+}
