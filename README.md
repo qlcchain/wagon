@@ -1,9 +1,9 @@
 wagon
 =====
 
-[![Build Status](https://travis-ci.org/go-interpreter/wagon.svg?branch=master)](https://travis-ci.org/go-interpreter/wagon)
-[![codecov](https://codecov.io/gh/go-interpreter/wagon/branch/master/graph/badge.svg)](https://codecov.io/gh/go-interpreter/wagon)
-[![GoDoc](https://godoc.org/github.com/go-interpreter/wagon?status.svg)](https://godoc.org/github.com/go-interpreter/wagon)
+[![Build Status](https://travis-ci.org/qlcchain/wagon.svg?branch=master)](https://travis-ci.org/qlcchain/wagon)
+[![codecov](https://codecov.io/gh/qlcchain/wagon/branch/master/graph/badge.svg)](https://codecov.io/gh/qlcchain/wagon)
+[![GoDoc](https://godoc.org/github.com/qlcchain/wagon?status.svg)](https://godoc.org/github.com/qlcchain/wagon)
 
 `wagon` is a [WebAssembly](http://webassembly.org)-based interpreter in [Go](https://golang.org), for [Go](https://golang.org).
 
